@@ -1,3 +1,10 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PV Form</title>
+    <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f9f9f9;
@@ -24,9 +31,10 @@
         .header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: center;
             padding: 20px;
             background-color: #fff;
+            position: relative;
         }
         .underline {
             width: 100%;
@@ -44,6 +52,8 @@
         }
         .logo {
             width: 150px;
+            position: absolute;
+            left: 20px;
         }
         .main-content {
             padding: 20px;
@@ -53,9 +63,7 @@
             text-align: center;
             margin-top: -2rem;
             margin-bottom: 0;
-            position: relative;
             animation: changeColor infinite 3s;
-            right: 2rem;
         }
         @keyframes changeColor {
             0% { color: #0a7caa; }
@@ -174,7 +182,6 @@
             }
             h1 {
                 font-size: 3rem;
-                right: 0;
             }
             .dropdown-container {
                 flex-direction: column;
@@ -199,4 +206,64 @@
                 width: 100%;
             }
         }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="https://logowik.com/content/uploads/images/adani-renewables-green-energy1681.logowik.com.webp" alt="Company Logo" class="logo">
+        <h1>PV Form</h1>
+    </div>
+    <div class="underline"></div>
+    <div class="dropdown-container">
+        <select class="dropdown" id="plantDropdown" onchange="selectPlant()">
+            {% for plant in plants %}
+            <option value="{{ plant }}">{{ plant }}</option>
+            {% endfor %}
+        </select>
+        <select class="dropdown" id="blockDropdown" onchange="selectBlock()" style="display:none;">
+            <!-- Options will be dynamically added here -->
+        </select>
+    </div>
+    
+    <div class="summary-container" id="summaryContainer" style="display: none;">
+        <h3>Summary</h3>
+        <div class="summary-row">
+            <div class="summary-item" id="totalBlocks"></div>
+            <div class="summary-item" id="totalString"></div>
+        </div>
+        <div class="summary-row">
+            <div class="summary-item" id="totalDcMWp"></div>
+            <div class="summary-item" id="InverterMake"></div>
+        </div>
+        <div class="summary-row">
+            <div class="summary-item" id="totalInverters"></div>
+            <div class="summary-item" id="invertersModels"></div>
+        </div>
+        <div class="summary-row">
+            <div class="summary-item" id="ModuleMake"></div>
+            <div class="summary-item" id="ModuleModels"></div>
+        </div>
+    </div>
+    <div class="main-content">
+        <div id="data"></div>
+        <button onclick="addRow()">Add Row</button>
+        <button onclick="saveData()">Save Data</button>
+    </div>
 
+    <script>
+        let currentBlock = '';
+        let currentPlant = '';
+
+        function createBlockDropdown(blocks, summary) {
+            const blockDropdown = document.getElementById('blockDropdown');
+            blockDropdown.innerHTML = '';
+            blocks.forEach(block => {
+                const option = document.createElement('option');
+                option.value = block;
+                option.text = block;
+                blockDropdown.appendChild(option);
+            });
+            blockDropdown.style.display = 'block';
+
+            // Display summary
+            const summaryContainer = document.get
