@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PV FORM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            background-color: #007BFF;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .header img {
+            height: 40px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        .header h1 {
+            display: inline;
+            font-size: 24px;
+        }
+        .main-content {
+            padding: 20px;
+        }
+        .dropdown {
+            padding: 10px;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .search-bar {
+            padding: 10px;
+            width: 300px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .delete-btn {
+            background-color: #FF0000;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .delete-all-btn {
+            background-color: #FF0000;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            display: block;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Adani_Green_Energy_logo.svg" alt="Logo">
+        <h1>PV FORM</h1>
+    </div>
+    <div class="main-content">
+        <select id="plantSelect" class="dropdown">
+            <option value="">Select Plant</option>
+            {% for plant in plants %}
+            <option value="{{ plant }}">{{ plant }}</option>
+            {% endfor %}
+        </select>
+        <select id="blockSelect" class="dropdown">
+            <option value="">Select Block</option>
+        </select>
+        <div id="summaryContainer" style="display: none;">
+            <div>Total Blocks: <span id="totalBlocks"></span></div>
+            <div>Total DC MWp: <span id="totalDcMWp"></span></div>
+            <div>Inverter Make: <span id="invMake"></span></div>
+            <div>Inverter Model: <span id="total_invModel"></span></div>
+            <div>Module Make: <span id="total_modMake"></span></div>
+            <div>Module Model: <span id="total_ModModel"></span></div>
+            <div>Total Strings: <span id="strCount"></span></div>
+        </div>
+        <div class="container">
+            <input type="text" id="searchInput" class="search-bar" placeholder="Search...">
+            <button class="delete-all-btn" onclick="deleteSelectedRows()">Delete Selected Rows</button>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Select</th>
+                        <th>ID</th>
+                        <th>Plant</th>
+                        <th>Block</th>
+                        <th>INV NO</th>
+                        <th>STRINGS</th>
+                        <th>STRINGS current</th>
+                        <th>Voltage</th>
+                        <th>POW</th>
+                        <th>Energy</th>
+                        <th>Date</th>
+                        <th>Weather</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const plants = {{ plants|tojson }};
+            const plantSelect = document.getElementById("plantSelect");
+            const blockSelect = document.getElementById("blockSelect");
+            const summaryContainer = document.getElementById("summaryContainer");
+            const totalBlocks = document.getElementById("totalBlocks");
+            const totalDcMWp = document.getElementById("totalDcMWp");
+            const invMake = document.getElementById("invMake");
+            const total_invModel = document.getElementById("total_invModel");
+            const total_modMake = document.getElementById("total_modMake");
+            const total_ModModel = document.getElementById("total_ModModel");
+            const strCount = document.getElementById("strCount");
+            const searchInput = document.getElementById("searchInput");
+            const dataTableBody = document.querySelector("#dataTable tbody");
+
+            plantSelect.addEventListener("change", async function () {
+                const plant = plantSelect.value;
+                if (plant) {
+                    const response = await fetch(`/load_data?plant=${plant}`);
+                    const data = await response.json();
+                    blockSelect.innerHTML = '<option value="">Select Block</option>';
+                    data.blocks.forEach(block => {
+                        const option = document.createElement("option");
+                        option.value = block;
+                        option.textContent = block;
+                        blockSelect.appendChild(option);
+                    });
+                    totalBlocks.textContent = data.summary.total_blocks;
+                    totalDcMWp.textContent = data.summary.total_dc_mwp;
+                    invMake.textContent = data.summary.invMake;
+                    total_invModel.textContent = data.summary.total_invModel;
+                    total_modMake.textContent = data.summary.total_modMake;
+                    total_ModModel.textContent = data.summary.total_ModModel;
+                    strCount.textContent = data.summary.strCount;
+                    summaryContainer.style.display = 'block';
+                } else {
+                    blockSelect.innerHTML = '<option value="">Select Block</option>';
+                    summaryContainer.style.display = 'none';
+                }
+                dataTableBody.innerHTML = '';
+            });
+
+            blockSelect.addEventListener("change", async function () {
+                const plant = plantSelect.value;
+                const block = blockSelect.value;
+                if (plant && block) {
+                    const response = await fetch(`/load_data?plant=${plant}&block=${block}`);
+                    const data = await response.json();
+                    dataTableBody.innerHTML = data.map(row => `
+                        <tr>
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td>${row.ID}</td>
+                            <td>${row.Plant}</td>
+                            <td>${row.Block}</td>
+                            <td>${row.INV_NO}</td>
+                            <td>${row.STRINGS}</td>
+                            <td>${row.STRINGS_current}</td>
+                            <td>${row.Voltage}</td>
+                            <td>${row.POW}</td>
+                            <td>${row.Energy}</td>
+                            <td>${row.Date}</td>
+                            <td>${row.Weather}</td>
+                            <td><button class="delete-btn" onclick="deleteRow(this)">Delete</button></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    dataTableBody.innerHTML = '';
+                }
+            });
+
+            searchInput.addEventListener("input", function () {
+                const searchTerm = searchInput.value.toLowerCase();
+                const rows = dataTableBody.getElementsByTagName("tr");
+                Array.from(rows).forEach(row => {
+                    const cells = row.getElementsByTagName("td");
+                    const rowText = Array.from(cells).map(cell => cell.textContent.toLowerCase()).join(" ");
+                    row.style.display = rowText.includes(searchTerm) ? "" : "none";
+                });
+            });
+        });
+
+        function deleteRow(button) {
+            const row = button.closest("tr");
+            row.parentNode.removeChild(row);
+        }
+
+        function deleteSelectedRows() {
+            const checkboxes = document.querySelectorAll(".row-checkbox:checked");
+            checkboxes.forEach(checkbox => {
+                const row = checkbox.closest("tr");
+                row.parentNode.removeChild(row);
+            });
+        }
+    </script>
+</body>
+</html>
