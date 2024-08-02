@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, render_template, render_template_stri
 import socket
 import webbrowser
 from threading import Timer
+
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
@@ -20,7 +21,7 @@ def remove(string):
     return string.replace(" ", "")
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'      # Change this to a random secret key for session management
+app.secret_key = 'your_secret_key'  # Change this to a random secret key for session management
 
 USERNAME = 'admin'
 PASSWORD = 'password123'
@@ -41,7 +42,6 @@ def load_data():
         block_data = df2[df2['Block'] == block]
         return jsonify(block_data.to_dict(orient='records'))
     blocks = df2.Block.unique()
-    # Calculate summary statistics
     rt = df2.astype(str)
     rt['DCCapacityKWp'] = pd.to_numeric(rt['DCCapacityKWp'], errors='coerce')
     totalblocks = len(rt.Block.unique())
@@ -53,7 +53,6 @@ def load_data():
     modMake = str(rt.Modulemake.unique())
     ModModel = str(rt.ModuleModel.unique())
     stringcounts = len(rt.STRINGS.notnull())
-
     summary = {
         'total_blocks': totalblocks,
         'total_dc_mwp': totaldcMWp,
@@ -63,7 +62,6 @@ def load_data():
         'total_modMake': modMake,
         'total_ModModel': ModModel
     }
-
     return jsonify({
         'blocks': blocks.tolist(),
         'summary': summary
@@ -259,76 +257,76 @@ def home():
             box-shadow: 0 0 8px rgba(0, 91, 187, 0.5);
             outline: none;
         }
-        .button {
-            background-color: #007BFF;
-            color: white;
-            padding: 10px 20px;
-            border: none;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
             border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
-        }
-        .button:hover {
-            background-color: #0056b3;
+            margin-top: 20px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
         }
-        th, td {
-            padding: 12px;
+        table, th, td {
             border: 1px solid #ddd;
-            text-align: left;
+            padding: 10px;
         }
         th {
             background-color: #007BFF;
             color: white;
         }
         tr:nth-child(even) {
-            background-color: #f9f9f9;
+            background-color: #f2f2f2;
         }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        .checkbox-cell {
-            text-align: center;
-        }
-        .delete-button {
+        .delete-btn {
             background-color: #FF0000;
             color: white;
-            padding: 10px 20px;
             border: none;
-            border-radius: 5px;
+            padding: 5px 10px;
             cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
+            border-radius: 3px;
         }
-        .delete-button:hover {
-            background-color: #cc0000;
+        .delete-btn:hover {
+            background-color: #CC0000;
+        }
+        .delete-all-btn {
+            background-color: #FF0000;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            display: block;
+            margin: 20px auto;
+        }
+        .delete-all-btn:hover {
+            background-color: #CC0000;
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <img src="https://github.com/Tusharlad123/PVform/blob/main/adani-logo.png?raw=true" alt="Logo" class="logo">
-        <h1>Adani Green Energy</h1>
-    </header>
-    <div class="underline"></div>
-    <div class="main-content">
-        <div class="dropdown-container">
-            <select id="plantDropdown" class="dropdown">
-                <option value="">Select Plant</option>
-                {% for plant in plants %}
-                    <option value="{{ plant }}">{{ plant }}</option>
-                {% endfor %}
-            </select>
-            <select id="blockDropdown" class="dropdown">
-                <option value="">Select Block</option>
-            </select>
+    <div class="header">
+        <img class="logo" src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Adani_Green_Energy_logo.svg" alt="Logo">
+        <div>
+            <h1>PV FORM</h1>
+            <div class="underline"></div>
         </div>
-        <div class="summary-container">
+    </div>
+    <div class="main-content">
+        <select id="plantSelect" class="dropdown">
+            <option value="">Select Plant</option>
+            {% for plant in plants %}
+            <option value="{{ plant }}">{{ plant }}</option>
+            {% endfor %}
+        </select>
+        <select id="blockSelect" class="dropdown">
+            <option value="">Select Block</option>
+        </select>
+        <div class="summary-container" id="summaryContainer" style="display: none;">
             <div class="summary-row">
                 <div class="summary-item">Total Blocks: <span id="totalBlocks"></span></div>
                 <div class="summary-item">Total DC MWp: <span id="totalDcMWp"></span></div>
@@ -342,150 +340,155 @@ def home():
                 <div class="summary-item">Module Model: <span id="total_ModModel"></span></div>
             </div>
             <div class="summary-row">
-                <div class="summary-item">String Count: <span id="strCount"></span></div>
+                <div class="summary-item">Total Strings: <span id="strCount"></span></div>
             </div>
         </div>
-        <input type="text" id="searchInput" class="search-bar" placeholder="Search...">
-        <table id="dataTable">
-            <thead>
-                <tr>
-                    {% for column in df1.columns %}
-                        <th>{{ column }}</th>
-                    {% endfor %}
-                    <th class="checkbox-cell"><input type="checkbox" id="selectAll"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Data rows will be added here dynamically -->
-            </tbody>
-        </table>
-        <button class="delete-button" id="deleteSelected">Delete Selected</button>
+        <div class="container">
+            <input type="text" id="searchInput" class="search-bar" placeholder="Search...">
+            <button class="delete-all-btn" onclick="deleteSelectedRows()">Delete Selected Rows</button>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Select</th>
+                        <th>ID</th>
+                        <th>Plant</th>
+                        <th>Block</th>
+                        <th>INV NO</th>
+                        <th>STRINGS</th>
+                        <th>STRINGS current</th>
+                        <th>Voltage</th>
+                        <th>POW</th>
+                        <th>Energy</th>
+                        <th>Date</th>
+                        <th>Weather</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const plantDropdown = document.getElementById('plantDropdown');
-            const blockDropdown = document.getElementById('blockDropdown');
-            const searchInput = document.getElementById('searchInput');
-            const selectAllCheckbox = document.getElementById('selectAll');
-            const deleteSelectedButton = document.getElementById('deleteSelected');
+        document.addEventListener("DOMContentLoaded", function () {
+            const plants = {{ plants|tojson }};
+            const plantSelect = document.getElementById("plantSelect");
+            const blockSelect = document.getElementById("blockSelect");
+            const summaryContainer = document.getElementById("summaryContainer");
+            const totalBlocks = document.getElementById("totalBlocks");
+            const totalDcMWp = document.getElementById("totalDcMWp");
+            const invMake = document.getElementById("invMake");
+            const total_invModel = document.getElementById("total_invModel");
+            const total_modMake = document.getElementById("total_modMake");
+            const total_ModModel = document.getElementById("total_ModModel");
+            const strCount = document.getElementById("strCount");
+            const searchInput = document.getElementById("searchInput");
+            const dataTableBody = document.querySelector("#dataTable tbody");
 
-            plantDropdown.addEventListener('change', function () {
-                const plant = plantDropdown.value;
+            plantSelect.addEventListener("change", async function () {
+                const plant = plantSelect.value;
                 if (plant) {
-                    fetchBlocksAndSummary(plant);
+                    const response = await fetch(`/load_data?plant=${plant}`);
+                    const data = await response.json();
+                    blockSelect.innerHTML = '<option value="">Select Block</option>';
+                    data.blocks.forEach(block => {
+                        const option = document.createElement("option");
+                        option.value = block;
+                        option.textContent = block;
+                        blockSelect.appendChild(option);
+                    });
+                    totalBlocks.textContent = data.summary.total_blocks;
+                    totalDcMWp.textContent = data.summary.total_dc_mwp;
+                    invMake.textContent = data.summary.invMake;
+                    total_invModel.textContent = data.summary.total_invModel;
+                    total_modMake.textContent = data.summary.total_modMake;
+                    total_ModModel.textContent = data.summary.total_ModModel;
+                    strCount.textContent = data.summary.strCount;
+                    summaryContainer.style.display = "block";
                 } else {
-                    blockDropdown.innerHTML = '<option value="">Select Block</option>';
+                    blockSelect.innerHTML = '<option value="">Select Block</option>';
+                    summaryContainer.style.display = "none";
                 }
             });
 
-            blockDropdown.addEventListener('change', function () {
-                const plant = plantDropdown.value;
-                const block = blockDropdown.value;
-                if (plant && block) {
-                    loadData(plant, block);
+            blockSelect.addEventListener("change", async function () {
+                const plant = plantSelect.value;
+                const block = blockSelect.value;
+                if (block) {
+                    const response = await fetch(`/load_data?plant=${plant}&block=${block}`);
+                    const data = await response.json();
+                    populateTable(data);
+                } else {
+                    clearTable();
                 }
             });
 
-            searchInput.addEventListener('input', function () {
+            searchInput.addEventListener("input", function () {
                 const searchTerm = searchInput.value.toLowerCase();
                 filterTable(searchTerm);
             });
-
-            selectAllCheckbox.addEventListener('change', function () {
-                const checkboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = selectAllCheckbox.checked;
-                });
-            });
-
-            deleteSelectedButton.addEventListener('click', function () {
-                deleteSelectedRows();
-            });
-
-            function fetchBlocksAndSummary(plant) {
-                fetch(`/load_data?plant=${plant}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        populateBlockDropdown(data.blocks);
-                        updateSummary(data.summary);
-                    })
-                    .catch(error => console.error('Error fetching blocks:', error));
-            }
-
-            function populateBlockDropdown(blocks) {
-                blockDropdown.innerHTML = '<option value="">Select Block</option>';
-                blocks.forEach(block => {
-                    const option = document.createElement('option');
-                    option.value = block;
-                    option.textContent = block;
-                    blockDropdown.appendChild(option);
-                });
-            }
-
-            function updateSummary(summary) {
-                document.getElementById('totalBlocks').textContent = summary.total_blocks;
-                document.getElementById('totalDcMWp').textContent = summary.total_dc_mwp;
-                document.getElementById('invMake').textContent = summary.invMake;
-                document.getElementById('total_invModel').textContent = summary.total_invModel;
-                document.getElementById('total_modMake').textContent = summary.total_modMake;
-                document.getElementById('total_ModModel').textContent = summary.total_ModModel;
-                document.getElementById('strCount').textContent = summary.strCount;
-            }
-
-            function loadData(plant, block) {
-                fetch(`/load_data?plant=${plant}&block=${block}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        populateTable(data);
-                    })
-                    .catch(error => console.error('Error loading data:', error));
-            }
-
-            function populateTable(data) {
-                const tbody = document.querySelector('#dataTable tbody');
-                tbody.innerHTML = '';
-                data.forEach(row => {
-                    const tr = document.createElement('tr');
-                    {% for column in df1.columns %}
-                        const td{{ column }} = document.createElement('td');
-                        td{{ column }}.textContent = row.{{ column }};
-                        tr.appendChild(td{{ column }});
-                    {% endfor %}
-                    const checkboxTd = document.createElement('td');
-                    checkboxTd.className = 'checkbox-cell';
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkboxTd.appendChild(checkbox);
-                    tr.appendChild(checkboxTd);
-                    tbody.appendChild(tr);
-                });
-            }
-
-            function filterTable(searchTerm) {
-                const rows = document.querySelectorAll('#dataTable tbody tr');
-                rows.forEach(row => {
-                    const cells = Array.from(row.cells).slice(0, -1); // Exclude the last cell (checkbox cell)
-                    const rowText = cells.map(cell => cell.textContent.toLowerCase()).join(' ');
-                    row.style.display = rowText.includes(searchTerm) ? '' : 'none';
-                });
-            }
-
-            function deleteSelectedRows() {
-                const checkboxes = document.querySelectorAll('tbody input[type="checkbox"]:checked');
-                checkboxes.forEach(checkbox => {
-                    const row = checkbox.closest('tr');
-                    row.remove();
-                });
-                selectAllCheckbox.checked = false;
-            }
         });
+
+        function populateTable(data) {
+            const dataTableBody = document.querySelector("#dataTable tbody");
+            dataTableBody.innerHTML = "";
+            data.forEach(row => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="row-checkbox" data-id="${row.ID}"></td>
+                    <td>${row.ID}</td>
+                    <td>${row.Plant}</td>
+                    <td>${row.Block}</td>
+                    <td>${row.INV_NO}</td>
+                    <td>${row.STRINGS}</td>
+                    <td>${row.STRINGS_current}</td>
+                    <td>${row.Voltage}</td>
+                    <td>${row.POW}</td>
+                    <td>${row.Energy}</td>
+                    <td>${row.Date}</td>
+                    <td>${row.Weather}</td>
+                    <td><button class="delete-btn" onclick="deleteRow('${row.ID}')">Delete</button></td>
+                `;
+                dataTableBody.appendChild(tr);
+            });
+        }
+
+        function clearTable() {
+            const dataTableBody = document.querySelector("#dataTable tbody");
+            dataTableBody.innerHTML = "";
+        }
+
+        function filterTable(searchTerm) {
+            const rows = document.querySelectorAll("#dataTable tbody tr");
+            rows.forEach(row => {
+                const cells = row.querySelectorAll("td");
+                let match = false;
+                cells.forEach(cell => {
+                    if (cell.textContent.toLowerCase().includes(searchTerm)) {
+                        match = true;
+                    }
+                });
+                row.style.display = match ? "" : "none";
+            });
+        }
+
+        function deleteRow(id) {
+            const row = document.querySelector(`#dataTable tbody tr input[data-id="${id}"]`).closest("tr");
+            row.remove();
+        }
+
+        function deleteSelectedRows() {
+            const selectedRows = document.querySelectorAll(".row-checkbox:checked");
+            selectedRows.forEach(checkbox => {
+                const row = checkbox.closest("tr");
+                row.remove();
+            });
+        }
     </script>
 </body>
 </html>
     """, plants=plants)
 
 if __name__ == '__main__':
-    port = 5000
-    url = f"http://127.0.0.1:{port}"
+    url = "http://127.0.0.1:5000/"
     Timer(1, lambda: webbrowser.open(url)).start()
-    app.run(port=port)
+    app.run(debug=False)
