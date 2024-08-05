@@ -1,0 +1,464 @@
+import pandas as pd
+from flask import Flask, request, jsonify, render_template, render_template_string, session, redirect, url_for
+import socket
+import webbrowser
+from threading import Timer
+
+from google.cloud import bigquery
+from google.oauth2 import service_account
+
+client = bigquery.Client(credentials=credentials, project=project_id)
+Tablename = "Static_plants"
+selectQuery = "SELECT * FROM agel-svc-winddata-dmz-prod.winddata." + Tablename
+
+df = client.query(selectQuery).to_dataframe()
+plants = df.Plantname.unique()
+
+def listToString(s):
+    return "".join(s)
+
+def remove(string):
+    return string.replace(" ", "")
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Change this to a random secret key for session management
+
+USERNAME = 'admin'
+PASSWORD = 'password123'
+
+@app.route('/load_data')
+def load_data():
+    plant = request.args.get('plant')
+    block = request.args.get('block')
+    filter_plant = df[df['Plantname'] == plant]
+    mytable = filter_plant.Tablename.unique()
+    mytable = listToString(mytable)
+    mytable = remove(mytable)
+    selectQuery = "SELECT * FROM agel-svc-winddata-dmz-prod.winddata." + mytable + " WHERE Plant = '" + plant + "'"
+    df1 = client.query(selectQuery).to_dataframe()
+    df2 = df1[df1['Plant'] == plant]
+    host = socket.gethostname()
+    if block:
+        block_data = df2[df2['Block'] == block]
+        return jsonify(block_data.to_dict(orient='records'))
+    blocks = df2.Block.unique()
+    # Calculate summary statistics
+    rt = df2.astype(str)
+    rt['DCCapacityKWp'] = pd.to_numeric(rt['DCCapacityKWp'], errors='coerce')
+    totalblocks = len(rt.Block.unique())
+    rt1 = rt[rt.DCCapacityKWp.notnull()]
+    totaldcMWp = round(sum(rt1['DCCapacityKWp']) / 1000, 2)
+    invMake = rt.INVMake.unique()
+    invMake = str(invMake)
+    invModel = str(rt.INVERTERModel.unique())
+    modMake = str(rt.Modulemake.unique())
+    ModModel = str(rt.ModuleModel.unique())
+    # Invertercount =
+    stringcounts = len(rt.STRINGS.notnull())
+    # totalyconnector =
+    
+    summary = {
+        'total_blocks': totalblocks,
+        'total_dc_mwp': totaldcMWp,
+        'strCount': stringcounts,
+        'invMake': invMake,
+        'total_invModel': invModel,
+        'total_modMake': modMake,
+        'total_ModModel': ModModel
+    }
+    
+    return jsonify({
+        'blocks': blocks.tolist(),
+        'summary': summary
+    })
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        if username == USERNAME and password == PASSWORD:
+            session['logged_in'] = True
+            return redirect(url_for('home'))
+        else:
+            return jsonify({'success': False, 'message': 'Invalid credentials'})
+    return render_template_string("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f9f9f9;
+            margin: 0;
+        }
+        .login-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+        .login-container h2 {
+            margin-bottom: 20px;
+        }
+        .login-container input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .login-container button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Login</h2>
+        <form method="post">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>
+    """)
+
+@app.route('/')
+def home():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return render_template_string("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PV Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+            background-image: url("https://github.com/Tusharlad123/PVform/blob/main/solar-881.gif?raw=true");
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+        .summary-container {
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+        }
+        .summary-item {
+            width: 45%;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background-color: #fff;
+            position: relative;
+        }
+        .underline {
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #0a7caa, #5b58a5, #0056b3, #8f298f, #0a7caa);
+            background-size: 500% 100%;
+            animation: colorChange 3s infinite;
+        }
+        @keyframes colorChange {
+            0% { background-position: 0% 0%; }
+            25% { background-position: 25% 0%; }
+            50% { background-position: 50% 0%; }
+            75% { background-position: 75% 0%; }
+            100% { background-position: 100% 0%; }
+        }
+        .logo {
+            width: 150px;
+            position: absolute;
+            left: 20px;
+        }
+        .main-content {
+            padding: 20px;
+        }
+        h1 {
+            font-size: 5rem;
+            text-align: center;
+            margin-top: -1rem;
+            margin-bottom: 0;
+            animation: changeColor infinite 3s;
+        }
+        @keyframes changeColor {
+            0% { color: #0a7caa; }
+            25% { color: #5b58a5; }
+            50% { color: #0056b3; }
+            75% { color: #8f298f; }
+            100% { color: #0a7caa; }
+        }
+        .dropdown-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+            gap: 20px;
+        }
+        .dropdown {
+            width: 200px;
+            padding: 10px;
+            background-color: #fff;
+            border: 2px solid #007BFF;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .dropdown:focus {
+            border-color: #005bb3;
+            box-shadow: 0 0 8px rgba(0, 91, 187, 0.5);
+            outline: none;
+        }
+        .search-bar {
+            display: block;
+            width: 300px;
+            padding: 10px;
+            margin: 20px auto;
+            background-color: #fff;
+            border: 2px solid #007BFF;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .search-bar:focus {
+            border-color: #005bb3;
+            box-shadow: 0 0 8px rgba(0, 91, 187, 0.5);
+            outline: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+        td {
+            background-color: #fff;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .delete-button {
+            padding: 10px 20px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+        }
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="https://example.com/your-logo.png" alt="Company Logo" class="logo">
+        <h1>PV Form</h1>
+    </div>
+    <div class="underline"></div>
+    <div class="main-content">
+        <input type="text" id="search-bar" class="search-bar" placeholder="Search...">
+        <div class="dropdown-container">
+            <select id="plant-dropdown" class="dropdown" onchange="loadBlocks()">
+                <option value="">Select Plant</option>
+                {% for plant in plants %}
+                    <option value="{{ plant }}">{{ plant }}</option>
+                {% endfor %}
+            </select>
+            <select id="block-dropdown" class="dropdown" onchange="loadData()">
+                <option value="">Select Block</option>
+            </select>
+        </div>
+        <div id="summary-container" class="summary-container" style="display: none;">
+            <div class="summary-row">
+                <div class="summary-item">Total Blocks: <span id="total-blocks"></span></div>
+                <div class="summary-item">Total DC MWp: <span id="total-dc-mwp"></span></div>
+            </div>
+            <div class="summary-row">
+                <div class="summary-item">String Count: <span id="strCount"></span></div>
+                <div class="summary-item">Inverter Make: <span id="invMake"></span></div>
+            </div>
+            <div class="summary-row">
+                <div class="summary-item">Inverter Model: <span id="total_invModel"></span></div>
+                <div class="summary-item">Module Make: <span id="total_modMake"></span></div>
+            </div>
+            <div class="summary-row">
+                <div class="summary-item">Module Model: <span id="total_ModModel"></span></div>
+            </div>
+        </div>
+        <button id="delete-button" class="delete-button">Delete Selected Rows</button>
+        <table id="data-table">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>ID</th>
+                    <th>Plant</th>
+                    <th>Block</th>
+                    <th>Data Point 1</th>
+                    <th>Data Point 2</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <script>
+        let dataTable = document.getElementById('data-table').getElementsByTagName('tbody')[0];
+        let deleteButton = document.getElementById('delete-button');
+
+        function loadBlocks() {
+            let plant = document.getElementById('plant-dropdown').value;
+            if (plant) {
+                fetch(`/load_data?plant=${plant}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        let blockDropdown = document.getElementById('block-dropdown');
+                        blockDropdown.innerHTML = '<option value="">Select Block</option>';
+                        data.blocks.forEach(block => {
+                            let option = document.createElement('option');
+                            option.value = block;
+                            option.textContent = block;
+                            blockDropdown.appendChild(option);
+                        });
+
+                        let summaryContainer = document.getElementById('summary-container');
+                        document.getElementById('total-blocks').textContent = data.summary.total_blocks;
+                        document.getElementById('total-dc-mwp').textContent = data.summary.total_dc_mwp;
+                        document.getElementById('strCount').textContent = data.summary.strCount;
+                        document.getElementById('invMake').textContent = data.summary.invMake;
+                        document.getElementById('total_invModel').textContent = data.summary.total_invModel;
+                        document.getElementById('total_modMake').textContent = data.summary.total_modMake;
+                        document.getElementById('total_ModModel').textContent = data.summary.total_ModModel;
+                        summaryContainer.style.display = 'block';
+                    });
+            }
+        }
+
+        function loadData() {
+            let plant = document.getElementById('plant-dropdown').value;
+            let block = document.getElementById('block-dropdown').value;
+            if (plant && block) {
+                fetch(`/load_data?plant=${plant}&block=${block}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        dataTable.innerHTML = '';
+                        data.forEach(row => {
+                            let newRow = dataTable.insertRow();
+                            let selectCell = newRow.insertCell();
+                            let selectCheckbox = document.createElement('input');
+                            selectCheckbox.type = 'checkbox';
+                            selectCell.appendChild(selectCheckbox);
+
+                            let idCell = newRow.insertCell();
+                            idCell.textContent = row.ID;
+
+                            let plantCell = newRow.insertCell();
+                            plantCell.textContent = row.Plant;
+
+                            let blockCell = newRow.insertCell();
+                            blockCell.textContent = row.Block;
+
+                            let dataPoint1Cell = newRow.insertCell();
+                            dataPoint1Cell.textContent = row.DataPoint1;
+
+                            let dataPoint2Cell = newRow.insertCell();
+                            dataPoint2Cell.textContent = row.DataPoint2;
+                        });
+                    });
+            }
+        }
+
+        deleteButton.addEventListener('click', function () {
+            let selectedRows = Array.from(dataTable.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => checkbox.closest('tr'));
+            selectedRows.forEach(row => {
+                let rowId = row.cells[1].textContent;
+                fetch('/delete_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id: rowId })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        row.remove();
+                    }
+                });
+            });
+        });
+
+        document.getElementById('search-bar').addEventListener('input', function () {
+            let filter = this.value.toLowerCase();
+            let rows = dataTable.getElementsByTagName('tr');
+            Array.from(rows).forEach(row => {
+                let cells = row.getElementsByTagName('td');
+                let match = Array.from(cells).some(cell => cell.textContent.toLowerCase().includes(filter));
+                row.style.display = match ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
+    """, plants=plants)
+
+@app.route('/delete_data', methods=['POST'])
+def delete_data():
+    data = request.get_json()
+    row_id = data['id']
+
+    # Delete from BigQuery
+    table_id = "agel-svc-winddata-dmz-prod.winddata." + Tablename
+    query = f"DELETE FROM `{table_id}` WHERE ID = '{row_id}'"
+    client.query(query)
+
+    return jsonify({'success': True})
+
+if __name__ == '__main__':
+    app.run(debug=True)
