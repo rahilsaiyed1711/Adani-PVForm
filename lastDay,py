@@ -341,8 +341,6 @@ def home():
                     <th>ID</th>
                     <th>Plant</th>
                     <th>Block</th>
-                    <th>Data Point 1</th>
-                    <th>Data Point 2</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -403,12 +401,6 @@ def home():
 
                             let blockCell = newRow.insertCell();
                             blockCell.textContent = row.Block;
-
-                            let dataPoint1Cell = newRow.insertCell();
-                            dataPoint1Cell.textContent = row.DataPoint1;
-
-                            let dataPoint2Cell = newRow.insertCell();
-                            dataPoint2Cell.textContent = row.DataPoint2;
                         });
                     });
             }
